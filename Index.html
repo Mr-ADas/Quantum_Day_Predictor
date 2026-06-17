@@ -1,0 +1,1190 @@
+<!DOCTYPE html> 
+<html lang="en"> 
+<head> 
+    <meta charset="UTF-8"> 
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"> 
+    <title>Quantum Day Predictor AI</title> 
+    <script src="https://cdn.tailwindcss.com"></script> 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script> 
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <style>
+        /* --- Hide Scrollbars cleanly --- */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
+        }
+
+        @keyframes shake {
+            0%   { transform: translate(1px, 1px) rotate(0deg); }
+            10%  { transform: translate(-1px, -2px) rotate(-1deg); }
+            20%  { transform: translate(-3px, 0px) rotate(1deg); }
+            30%  { transform: translate(3px, 2px) rotate(0deg); }
+            40%  { transform: translate(1px, -1px) rotate(1deg); }
+            50%  { transform: translate(-1px, 2px) rotate(-1deg); }
+            60%  { transform: translate(-3px, 1px) rotate(0deg); }
+            70%  { transform: translate(3px, 1px) rotate(-1deg); }
+            80%  { transform: translate(-1px, -1px) rotate(1deg); }
+            90%  { transform: translate(1px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+        @keyframes blink-red {
+            0%, 100% { background: #fff; }
+            50%      { background: #fee2e2; }
+        }
+        @keyframes spin-slow {
+            from { transform: rotate(0deg); }
+            to   { transform: rotate(360deg); }
+        }
+        @keyframes glitch {
+            0%   { clip-path: inset(0 0 95% 0); transform: translate(-2px, 0); }
+            20%  { clip-path: inset(30% 0 50% 0); transform: translate(2px, 0); }
+            40%  { clip-path: inset(60% 0 20% 0); transform: translate(-2px, 0); }
+            60%  { clip-path: inset(80% 0 5% 0);  transform: translate(2px, 0); }
+            80%  { clip-path: inset(10% 0 70% 0); transform: translate(0, 0); }
+            100% { clip-path: inset(0 0 95% 0);   transform: translate(0, 0); }
+        }
+        @keyframes bsod-in {
+            from { opacity: 0; transform: scale(1.05); }
+            to   { opacity: 1; transform: scale(1); }
+        }
+        @keyframes watermark-pulse {
+            0%, 100% { opacity: 0.20; }
+            50%       { opacity: 0.35; }
+        }
+        
+        .shake-active   { animation: shake 0.5s infinite; }
+        .font-mono-term { font-family: 'Courier New', Courier, monospace; }
+        
+        #bsod-overlay {
+            display: none; position: fixed; inset: 0; z-index: 10000;
+            background: #0000aa; color: #fff;
+            font-family: 'Courier New', monospace;
+            flex-direction: column; align-items: center; justify-content: center;
+            animation: bsod-in 0.3s ease;
+            padding: 2rem; overflow-y: auto;
+        }
+        #terms-overlay {
+            display: none; position: fixed; inset: 0; z-index: 9000;
+            background: rgba(0,0,0,0.85);
+            align-items: center; justify-content: center;
+            padding: 1rem;
+        }
+        #terms-box {
+            background: #fff; width: 100%; max-width: 480px; border-radius: 16px;
+            padding: 1.5rem; max-height: 85vh; display: flex; flex-direction: column;
+        }
+        #terms-scroll {
+            overflow-y: auto; flex: 1; margin: 1rem 0;
+            border: 1px solid #e5e7eb; border-radius: 8px; padding: 1rem;
+            font-size: 12px; color: #374151; line-height: 1.7;
+        }
+        .watermark {
+            position: absolute; inset: 0;
+            display: flex; align-items: center; justify-content: center;
+            pointer-events: none; overflow: hidden; border-radius: inherit;
+            z-index: 10;
+        }
+        .watermark-text {
+            font-size: clamp(50px, 15vw, 80px); font-weight: 900; color: #ef4444;
+            transform: rotate(-30deg); opacity: 0.25; white-space: nowrap;
+            animation: watermark-pulse 2s ease-in-out infinite;
+            letter-spacing: 4px; user-select: none;
+        }
+        .progress-bar-inner {
+            transition: width 0.1s linear;
+        }
+        #terms-progress-bar {
+            transition: width 0.2s;
+            background: #4f46e5;
+        }
+
+        /* ── Subscribe modal styles ── */
+        #subscribe-modal-overlay {
+            display: none; position: fixed; inset: 0; z-index: 8000;
+            background: rgba(0,0,0,0.6);
+            align-items: center; justify-content: center;
+            padding: 1rem;
+        }
+        #subscribe-modal-box {
+            background: #fff; border-radius: 16px;
+            border: 1px solid #e5e7eb;
+            width: 100%; max-width: 370px;
+            max-height: 90vh; 
+            overflow-y: auto; 
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .sm-stage { display: none; }
+        .sm-stage.active { display: block; }
+
+        .sm-hd { padding: 1.5rem 1.5rem 0.75rem; text-align: center; }
+        .sm-hd .sm-emoji { font-size: 40px; margin-bottom: 8px; }
+        .sm-hd h2 { font-size: 17px; font-weight: 700; color: #111827; margin: 0 0 4px; }
+        .sm-hd p  { font-size: 13px; color: #6b7280; margin: 0; line-height: 1.5; }
+
+        .sm-bd { padding: 0.75rem 1.5rem 1.5rem; }
+
+        .sm-btn {
+            width: 100%; padding: 11px; border-radius: 10px;
+            font-size: 14px; font-weight: 600; border: none; cursor: pointer;
+            transition: opacity 0.15s; margin-bottom: 8px; display: block;
+            box-sizing: border-box;
+        }
+        .sm-btn:last-child { margin-bottom: 0; }
+        .sm-btn:hover { opacity: 0.85; }
+        .sm-btn-red   { background: #991b1b; color: #fef2f2; }
+        .sm-btn-muted { background: #f3f4f6; color: #6b7280; border: 1px solid #e5e7eb; }
+        .sm-btn-green { background: #14532d; color: #f0fdf4; }
+
+        .sm-info {
+            display: flex; align-items: flex-start; gap: 10px;
+            background: #f9fafb; border-radius: 8px;
+            padding: 10px 12px; margin-bottom: 10px;
+            font-size: 13px; color: #6b7280; line-height: 1.5;
+            border: 1px solid #f3f4f6;
+        }
+        .sm-info svg { flex-shrink: 0; margin-top: 1px; }
+
+        .sm-fine { font-size: 10px; color: #9ca3af; text-align: center; line-height: 1.5; margin-top: 10px; }
+
+        .sm-counter {
+            text-align: center; background: #f9fafb;
+            border-radius: 10px; padding: 14px; margin-bottom: 12px;
+            border: 1px solid #f3f4f6;
+        }
+        .sm-counter .sm-big { font-size: 34px; font-weight: 700; color: #111827; font-variant-numeric: tabular-nums; }
+        .sm-counter .sm-lbl { font-size: 11px; color: #9ca3af; margin-top: 2px; }
+
+        .sm-pill-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+        .sm-pill {
+            font-size: 11px; padding: 5px 10px; border-radius: 99px;
+            border: 1px solid #e5e7eb; color: #6b7280; background: #f9fafb;
+            cursor: pointer; user-select: none; transition: opacity 0.15s;
+        }
+        .sm-pill.strike { text-decoration: line-through; opacity: 0.4; }
+
+        .sm-field-group { margin-bottom: 10px; }
+        .sm-field-label { font-size: 11px; color: #6b7280; margin-bottom: 3px; display: block; }
+        .sm-field-label .req { color: #991b1b; }
+        .sm-field-input {
+            width: 100%; box-sizing: border-box;
+            background: #f9fafb; border: 1px solid #e5e7eb;
+            border-radius: 8px; padding: 9px 12px; font-size: 13px;
+            color: #111827; outline: none; font-family: inherit;
+            transition: border-color 0.15s;
+        }
+        .sm-field-input:focus { border-color: #6b7280; }
+        .sm-field-input.sm-error { border-color: #991b1b; background: #fff7f7; }
+        .sm-two-col { display: flex; gap: 8px; }
+        .sm-two-col .sm-field-group { flex: 1; }
+
+        .sm-err-msg { font-size: 11px; color: #991b1b; margin-top: 6px; display: none; }
+        .sm-err-msg.show { display: block; }
+
+        .sm-proc-box {
+            background: #f9fafb; border-radius: 10px;
+            padding: 10px 12px; min-height: 130px;
+            border: 1px solid #f3f4f6;
+        }
+        .sm-proc-bar-row {
+            display: flex; justify-content: space-between;
+            font-size: 11px; color: #9ca3af; margin-bottom: 5px;
+        }
+        .sm-proc-track {
+            background: #e5e7eb; border-radius: 4px;
+            height: 6px; overflow: hidden; margin-bottom: 10px;
+        }
+        .sm-proc-fill {
+            height: 6px; border-radius: 4px; background: #1d4ed8;
+            width: 0%; transition: width 0.15s linear;
+        }
+        .sm-log-line { font-size: 11px; color: #6b7280; line-height: 1.9; }
+        .sm-log-line.final { color: #111827; font-weight: 600; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-[100dvh] flex p-4 sm:p-8 no-scrollbar">
+
+<!-- BSOD Overlay -->
+<div id="bsod-overlay" class="no-scrollbar">
+    <div style="text-align:center; max-width:600px; width: 100%;">
+        <div style="font-size: clamp(40px, 8vw, 64px); margin-bottom:1rem;">:(</div>
+        <h1 style="font-size: clamp(20px, 5vw, 28px); font-weight:bold; margin-bottom:1rem;">QUANTUM_BRAIN_OVERLOAD</h1>
+        <p style="margin-bottom:1rem; font-size: 14px; line-height:1.8;">
+            Your question was <strong>too dumb</strong> for our quantum processors.<br>
+            We're collecting some dumb info, and then we'll restart the AI for you.<br>
+            (0% complete — just like your life choices)
+        </p>
+        <div style="background:#fff; color:#0000aa; padding:12px; border-radius:6px; font-size:12px; margin-bottom:1.5rem; text-align:left; word-break: break-word;">
+            For more information about this error and possible fixes, visit<br>
+            <strong>https://www.google.com/search?q=what+day+is+tomorrow</strong>
+        </div>
+        <div id="bsod-progress" style="font-size:13px; margin-bottom:1rem;">Restarting AI in <span id="bsod-counter">10</span>s...</div>
+        <div style="background:#1e40af; border-radius:4px; height:6px; overflow:hidden;">
+            <div id="bsod-bar" style="background:#60a5fa; height:6px; width:0%; transition:width 0.2s;"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Terms & Conditions Overlay -->
+<div id="terms-overlay">
+    <div id="terms-box">
+        <h2 style="font-size:18px; font-weight:900; color:#1f2937; margin:0;">📜 Terms & Conditions</h2>
+        <p style="font-size:12px; color:#6b7280; margin:4px 0 0;">You must read all 47 pages before predicting.</p>
+        <div style="background:#f3f4f6; border-radius:6px; padding:6px 10px; margin-top:8px;">
+            <div style="font-size:11px; color:#6b7280; margin-bottom:4px;">Reading progress: <span id="terms-pct">0%</span></div>
+            <div style="background:#e5e7eb; border-radius:4px; height:5px;">
+                <div id="terms-progress-bar" style="height:5px; width:0%; border-radius:4px;"></div>
+            </div>
+        </div>
+        <div id="terms-scroll" class="no-scrollbar">
+            <p><strong>SECTION 1: INTRODUCTION AND DISCLAIMER OF ALL COMMON SENSE</strong></p>
+            <p>By using the Day Predictor AI ("the App", "this Abomination", "The Thing"), you hereby agree that you are at least 18 years of age or have the cognitive ability of an adult, neither of which we can verify.</p>
+            <p><strong>SECTION 2: LIMITATION OF LIABILITY FOR OBVIOUS FACTS</strong></p>
+            <p>The App predicts tomorrow's day. Tomorrow's day is available for free on any calendar, phone, microwave, or by simply counting. We are not responsible if you needed this app to figure that out.</p>
+            <p><strong>SECTION 3: QUANTUM HAMSTER CLAUSE</strong></p>
+            <p>All predictions are computed by a dedicated AI hamster running on a wheel powered by existential dread. The hamster's name is Gerald. Gerald is NOT a licensed meteorologist, astronomer, or fortune cookie writer. Predictions from Gerald are provided "as-is" with no warranty, express or implied, that Gerald has been paying attention.</p>
+            <p><strong>SECTION 4: DATA COLLECTION POLICY (THE CREEPY PART)</strong></p>
+            <p>We collect your: (a) guessed day, (b) incorrect guesses, (c) facial expressions via webcam (kidding... or are we?), (d) deepest fears, (e) childhood memories involving calendars, and (f) your browser history which we sell to a guy named Derek.</p>
+            <p><strong>SECTION 5: THE STUPID CAPTCHA</strong></p>
+            <p>Our CAPTCHA system accepts literally any input you provide. This is because we couldn't be bothered to implement real verification, and also because we fundamentally don't care. You could type "potato" and we would say "biometrics verified." We apologize for nothing.</p>
+            <p><strong>SECTION 6: AUDIO ASSAULT WAIVER</strong></p>
+            <p>By proceeding, you consent to receiving dial-up modem sounds, random beeps, and what we legally describe as "music" but what doctors describe as "a cry for help." Ear damage is the user's problem. Gerald is also not sorry.</p>
+            <p><strong>SECTION 7: THE 63-SECOND LOADING TIME</strong></p>
+            <p>The answer to your question is computed in approximately 0.0003 milliseconds. The remaining 62.9997 seconds are for dramatic effect. We believe in theater. You will wait and you will like it.</p>
+            <p><strong>SECTION 8: WRONG ANSWER INSULTS</strong></p>
+            <p>If you answer incorrectly, the App reserves the right to call you a dumbass, question your education, and compare your cognitive abilities unfavorably to a houseplant. This is protected speech. Gerald agrees.</p>
+            <p><strong>SECTION 9: THE SUBSCRIPTION MODEL</strong></p>
+            <p>Our Pro MAX™ tier at $99.99/week exists solely to see if anyone is dumb enough to click "Subscribe Now." If you clicked it, your bank already blocked the transaction. Your bank loves you. We do not.</p>
+            <p><strong>SECTION 10: GOVERNING LAW AND JURISDICTION</strong></p>
+            <p>These terms are governed by the laws of whatever flat-earth dimension you're currently in. All disputes shall be settled by Gerald. Gerald has no legal training. Gerald is a hamster.</p>
+            <p><strong>SECTION 11: INTELLECTUAL PROPERTY</strong></p>
+            <p>The concept of "what day is tomorrow" is not our intellectual property, though we tried to file a patent. The patent office sent us a cease-and-desist. We framed it.</p>
+            <p><strong>SECTION 12: COOKIES</strong></p>
+            <p>We use cookies. We also use biscuits, crackers, and occasionally a nice digestive. These are entirely different from browser cookies but we included this section because we were hungry.</p>
+            <p><strong>SECTION 13: FORCE MAJEURE</strong></p>
+            <p>We are not responsible for prediction failures caused by: acts of God, solar flares, Gerald escaping, the heat death of the universe, or you simply forgetting what day it was and blaming us.</p>
+            <p><strong>SECTION 14: UPDATES TO THESE TERMS</strong></p>
+            <p>We may update these Terms at any time by doing absolutely nothing and hoping you don't notice. Continued use of the App constitutes acceptance of all future changes, including ones we haven't thought of yet and ones Gerald made up.</p>
+            <p><strong>SECTION 15 through 47: MORE OF THE SAME</strong></p>
+            <p>Pages 15-47 contain 712 additional clauses that are legally identical to the above but use more synonyms for "dumbass." You have not read them. You will not read them. We know this. We respect your spirit.</p>
+            <br><p style="text-align:center; font-weight:bold; color:#ef4444;">★ SCROLL TO BOTTOM TO ENABLE THE "I AGREE" BUTTON ★</p>
+        </div>
+        <button id="terms-agree-btn" disabled
+            style="width:100%; padding:12px; border-radius:10px; font-weight:bold; font-size:15px;
+                   background:#e5e7eb; color:#9ca3af; cursor:not-allowed; border:none; transition:all 0.3s;">
+            I Have Read Every Word (liar)
+        </button>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     Subscribe Modal Overlay (multi-stage)
+     ══════════════════════════════════════════ -->
+<div id="subscribe-modal-overlay">
+    <div id="subscribe-modal-box" class="no-scrollbar">
+
+        <!-- STAGE 1: Price ticks up live -->
+        <div id="sm-s1" class="sm-stage active">
+            <div class="sm-hd">
+                <div class="sm-emoji">📈</div>
+                <h2>Almost there...</h2>
+                <p>One quick thing before checkout.</p>
+            </div>
+            <div class="sm-bd">
+                <div class="sm-counter">
+                    <div class="sm-big" id="sm-price-counter">$99.99</div>
+                    <div class="sm-lbl">Current price — updates every second</div>
+                </div>
+                <div class="sm-info">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+                    <span>Our quantum pricing engine recalculates based on demand. You thinking about it is raising the price.</span>
+                </div>
+                <button class="sm-btn sm-btn-red" id="sm-buy-btn" onclick="smGoStage(2)">Buy Now at $99.99</button>
+                <button class="sm-btn sm-btn-muted" onclick="smClose()">Never mind</button>
+                <p class="sm-fine">Price may increase between clicking and loading the next screen. It will.</p>
+            </div>
+        </div>
+
+        <!-- STAGE 2: Remove features -->
+        <div id="sm-s2" class="sm-stage">
+            <div class="sm-hd">
+                <div class="sm-emoji">✂️</div>
+                <h2>Customise your plan</h2>
+                <p>Tap features to remove them and lower your price.</p>
+            </div>
+            <div class="sm-bd">
+                <div class="sm-pill-row" id="sm-feature-pills">
+                    <span class="sm-pill" data-price="12.31">Predict tomorrow</span>
+                    <span class="sm-pill" data-price="8.50">Predict today</span>
+                    <span class="sm-pill" data-price="15.00">Correct answers</span>
+                    <span class="sm-pill" data-price="6.75">Results in English</span>
+                    <span class="sm-pill" data-price="10.20">Loading bar finishes</span>
+                    <span class="sm-pill" data-price="9.99">No screaming sounds</span>
+                    <span class="sm-pill" data-price="11.44">Answers make sense</span>
+                    <span class="sm-pill" data-price="7.23">The app loads at all</span>
+                </div>
+                <div class="sm-counter">
+                    <div class="sm-big" id="sm-custom-price">$736.42</div>
+                    <div class="sm-lbl">Your customised price</div>
+                </div>
+                <div class="sm-info">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    <span>Removing everything still leaves a <strong style="color:#111827;">$699.99</strong> base platform fee.</span>
+                </div>
+                <button class="sm-btn sm-btn-red" onclick="smGoStage(3)">Proceed to payment</button>
+                <button class="sm-btn sm-btn-muted" onclick="smClose()">This is robbery</button>
+            </div>
+        </div>
+
+        <!-- STAGE 3: Checkout form -->
+        <div id="sm-s3" class="sm-stage">
+            <div class="sm-hd">
+                <div class="sm-emoji">🔐</div>
+                <h2>Secure checkout</h2>
+                <p>256-bit encryption. Possibly more bits.</p>
+            </div>
+            <div class="sm-bd">
+                <div class="sm-field-group">
+                    <label class="sm-field-label">Card number <span class="req">*</span></label>
+                    <input id="sm-f-card" class="sm-field-input" type="text" maxlength="19" placeholder="1234 5678 9012 3456" />
+                </div>
+                <div class="sm-two-col">
+                    <div class="sm-field-group">
+                        <label class="sm-field-label">Expiry <span class="req">*</span></label>
+                        <input id="sm-f-expiry" class="sm-field-input" type="text" maxlength="5" placeholder="MM/YY" />
+                    </div>
+                    <div class="sm-field-group">
+                        <label class="sm-field-label">CVV <span class="req">*</span></label>
+                        <input id="sm-f-cvv" class="sm-field-input" type="text" maxlength="3" placeholder="•••" />
+                    </div>
+                </div>
+                <div class="sm-field-group">
+                    <label class="sm-field-label">Blood type <span class="req">*</span></label>
+                    <input id="sm-f-blood" class="sm-field-input" type="text" placeholder="e.g. O+" />
+                </div>
+                <div class="sm-field-group">
+                    <label class="sm-field-label">Favourite dinosaur <span class="req">*</span> <span style="font-size:10px;opacity:0.7;">(affects your APR)</span></label>
+                    <select id="sm-f-dino" class="sm-field-input">
+                        <option value="">— Select a dinosaur —</option>
+                        <option>Tyrannosaurus Rex</option>
+                        <option>Velociraptor</option>
+                        <option>Triceratops</option>
+                        <option>Brachiosaurus</option>
+                        <option>Stegosaurus</option>
+                        <option>Ankylosaurus</option>
+                        <option>Spinosaurus</option>
+                        <option>Pterodactyl</option>
+                        <option>Diplodocus</option>
+                        <option>Parasaurolophus</option>
+                    </select>
+                </div>
+                <div id="sm-form-error" class="sm-err-msg">Please fill in all fields before proceeding.</div>
+                <div style="margin-top:14px;">
+                    <button class="sm-btn sm-btn-red" onclick="smSubmitForm()">Complete purchase</button>
+                    <button class="sm-btn sm-btn-muted" onclick="smClose()">I refuse</button>
+                </div>
+                <p class="sm-fine">Your blood type is used for risk assessment.<br>Your dinosaur preference affects your APR by up to 4.7%.</p>
+            </div>
+        </div>
+
+        <!-- STAGE 4: Processing -->
+        <div id="sm-s4" class="sm-stage">
+            <div class="sm-hd">
+                <div class="sm-emoji" id="sm-proc-emoji">⚙️</div>
+                <h2 id="sm-proc-title">Processing your order...</h2>
+                <p id="sm-proc-sub">Do not close this window.</p>
+            </div>
+            <div class="sm-bd">
+                <div class="sm-proc-box">
+                    <div class="sm-proc-bar-row">
+                        <span id="sm-proc-label">Starting up...</span>
+                        <span id="sm-proc-pct">0%</span>
+                    </div>
+                    <div class="sm-proc-track">
+                        <div class="sm-proc-fill" id="sm-proc-bar"></div>
+                    </div>
+                    <div id="sm-proc-log"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- EXIT -->
+        <div id="sm-sout" class="sm-stage">
+            <div class="sm-hd">
+                <div class="sm-emoji">📅</div>
+                <h2>You escaped.</h2>
+                <p>Most people don't make it this far.</p>
+            </div>
+            <div class="sm-bd">
+                <div class="sm-info">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    <span>A free calendar app is pre-installed on every phone ever made. It knows what day it is. It has always known.</span>
+                </div>
+                <div class="sm-info">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="13"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    <span>Money saved: <strong style="color:#111827;">$5,199.48</strong>. You're welcome.</span>
+                </div>
+                <button class="sm-btn sm-btn-green" onclick="smClose()">Close and maybe reflect</button>
+            </div>
+        </div>
+
+    </div>
+</div>
+<!-- ══ End Subscribe Modal ══ -->
+
+<!-- Main App Container -->
+<div id="app-container" class="m-auto bg-white rounded-3xl shadow-2xl p-6 sm:p-8 max-w-md w-full relative transition-all duration-300 overflow-hidden">
+
+    <!-- Watermark (shown on wrong answer) -->
+    <div id="wrong-watermark" class="watermark" style="display:none;">
+        <div class="watermark-text">DUMBASS</div>
+    </div>
+
+    <!-- Header -->
+    <div class="text-center mb-6 sm:mb-8">
+        <h1 class="text-3xl font-black text-gray-800 bg-clip-text text-transparent bg-gradient-to-r from-purple-600 to-blue-500 mb-2">Day Predictor AI</h1>
+        <span class="bg-red-100 text-red-600 text-xs font-bold px-2 py-1 rounded-full animate-pulse">Enterprise Quantum Edition v4.20</span>
+    </div>
+
+    <!-- PHASE 1: User Input -->
+    <div id="phase-input" class="space-y-6">
+        <p class="text-center text-gray-600 font-medium">Tomorrow is which day?</p>
+        <div class="grid grid-cols-2 gap-3" id="day-buttons"></div>
+
+        <div class="pt-4 relative h-16">
+            <button id="predict-btn"
+                class="absolute w-full left-0 bg-gradient-to-r from-green-400 to-green-600 hover:from-green-500 hover:to-green-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg transform transition-all duration-100 opacity-50 cursor-not-allowed"
+                disabled>
+                PREDICT
+            </button>
+        </div>
+    </div>
+
+    <!-- PHASE 1.5: CAPTCHA -->
+    <div id="phase-captcha" class="hidden flex-col items-center justify-center space-y-4 py-4">
+        <h2 class="text-xl font-black text-red-600 mb-2 tracking-widest text-center">🤖 SECURITY VERIFICATION 🤖</h2>
+        <p class="text-sm text-gray-600 mb-2 font-medium text-center">Prove you are a carbon-based lifeform.</p>
+        <div class="bg-gray-50 p-5 rounded-xl border-2 border-gray-300 w-full shadow-inner relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-1 bg-red-500"></div>
+            <p id="captcha-question" class="text-sm font-bold text-gray-800 mb-4 break-words"></p>
+            <input type="text" id="captcha-input"
+                class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 mb-4 transition-colors placeholder-gray-400 text-sm font-mono"
+                placeholder="Enter exact answer...">
+            <button id="verify-btn"
+                class="w-full bg-gray-800 hover:bg-black text-white font-bold py-3 px-4 rounded-lg transition-colors shadow-lg">
+                VERIFY HUMANITY
+            </button>
+        </div>
+        <p id="captcha-error" class="text-xs text-red-600 font-bold hidden bg-red-100 px-3 py-2 rounded-md">Error: Input required. Are you a toaster?</p>
+    </div>
+
+    <!-- PHASE 2: Loading -->
+    <div id="phase-loading" class="hidden flex-col items-center justify-center space-y-6 py-4">
+        <div class="w-full bg-black rounded-lg p-3 h-32 overflow-hidden relative border border-green-900 shadow-inner">
+            <div class="absolute top-0 left-0 w-full h-full bg-green-500 opacity-10 pointer-events-none"></div>
+            <div id="terminal-output" class="text-green-400 font-mono-term text-xs flex flex-col justify-end h-full"></div>
+        </div>
+
+        <div class="w-full">
+            <div class="flex justify-between mb-1">
+                <span class="text-xs font-semibold text-blue-700 uppercase">Neural Net Processing</span>
+                <span class="text-xs font-semibold text-blue-700" id="progress-percentage">0%</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2.5">
+                <div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full progress-bar-inner" style="width: 0%"></div>
+            </div>
+            <p id="progress-warning" class="text-xs text-red-500 font-bold mt-1 h-4"></p>
+        </div>
+
+        <div class="text-center w-full relative">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-3"></div>
+            <h3 id="loading-message" class="text-sm font-bold text-gray-800 h-14 flex items-center justify-center text-center">
+                Waking up the AI...
+            </h3>
+        </div>
+    </div>
+
+    <!-- PHASE 3: Result -->
+    <div id="phase-result" class="hidden space-y-6 text-center relative">
+        <div id="result-icon-container" class="inline-flex items-center justify-center w-20 h-20 bg-green-100 rounded-full mb-4">
+            <span id="result-icon"></span>
+        </div>
+
+        <div id="result-box-container" class="bg-green-50 border-2 border-green-200 rounded-xl p-6">
+            <h2 id="result-heading" class="text-xl text-gray-800 mb-2">Prediction Complete!</h2>
+            <p class="text-2xl font-black text-green-700" id="result-text">Tomorrow is [Day]</p>
+        </div>
+
+        <div id="ai-report-box" class="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
+            <p id="ai-report-title" class="text-sm font-bold text-yellow-800">🧠 AI Analysis Report:</p>
+            <p id="ai-report-text" class="text-sm text-yellow-700 mt-1 break-words whitespace-pre-wrap"></p>
+        </div>
+
+        <!-- Subscription -->
+        <div class="mt-8 border-t border-gray-200 pt-6">
+            <div class="bg-gradient-to-r from-purple-100 to-pink-100 p-5 rounded-xl border-2 border-purple-300 shadow-sm relative overflow-hidden">
+                <div class="absolute top-5 -right-14 w-48 text-center bg-gradient-to-r from-yellow-200 via-yellow-400 to-yellow-500 text-yellow-900 text-[11px] font-black py-1.5 rotate-45 shadow-md border-y border-yellow-300 tracking-widest uppercase z-10">POPULAR</div>
+                <h4 class="font-black text-purple-900 text-lg mb-1">Day Predictor <span class="text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-pink-600">Pro MAX™ Turbo</span></h4>
+                <ul class="text-xs text-purple-700 mb-4 text-left space-y-1.5 font-medium">
+                    <li>✔️ Predict up to 2 days in advance</li>
+                    <li>✔️ Remove 'DUMBASS' watermark</li>
+                    <li>✔️ Dedicated AI Hamster (Gerald, certified)</li>
+                    <li>✔️ Access to our exclusive flat-earth calendar</li>
+                    <li>✔️ Priority lane to bother Stephen Hawking</li>
+                </ul>
+                <p class="text-sm font-bold text-purple-900 mb-1">Only $99.99 / week</p>
+                <p class="text-xs text-purple-500 mb-3">(billed annually as one payment of $5,199.48 + Gerald's therapy costs)</p>
+                <button onclick="smOpen()"
+                    class="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white text-sm font-bold py-3 rounded-lg shadow-lg hover:from-purple-700 hover:to-pink-700 mb-3 transition-transform transform hover:scale-[1.02]">
+                    Subscribe Now
+                </button>
+                <button onclick="location.reload()" class="text-xs text-gray-500 underline hover:text-gray-800">I am poor, let me try again for free</button>
+            </div>
+        </div>
+    </div>
+
+</div><!-- /app-container -->
+
+<script>
+// ─── DOM ───────────────────────────────────────────────────────────────────────
+const dayButtonsContainer = document.getElementById('day-buttons');
+const predictBtn          = document.getElementById('predict-btn');
+const phaseInput          = document.getElementById('phase-input');
+const phaseCaptcha        = document.getElementById('phase-captcha');
+const phaseLoading        = document.getElementById('phase-loading');
+const phaseResult         = document.getElementById('phase-result');
+const captchaQuestion     = document.getElementById('captcha-question');
+const captchaInput        = document.getElementById('captcha-input');
+const verifyBtn           = document.getElementById('verify-btn');
+const captchaError        = document.getElementById('captcha-error');
+const loadingMessage      = document.getElementById('loading-message');
+const progressBar         = document.getElementById('progress-bar');
+const progressPercentage  = document.getElementById('progress-percentage');
+const progressWarning     = document.getElementById('progress-warning');
+const terminalOutput      = document.getElementById('terminal-output');
+const appContainer        = document.getElementById('app-container');
+const resultIconContainer = document.getElementById('result-icon-container');
+const resultIcon          = document.getElementById('result-icon');
+const resultBoxContainer  = document.getElementById('result-box-container');
+const resultHeading       = document.getElementById('result-heading');
+const resultText          = document.getElementById('result-text');
+const aiReportBox         = document.getElementById('ai-report-box');
+const aiReportTitle       = document.getElementById('ai-report-title');
+const aiReportText        = document.getElementById('ai-report-text');
+const wrongWatermark      = document.getElementById('wrong-watermark');
+const bsodOverlay         = document.getElementById('bsod-overlay');
+const termsOverlay        = document.getElementById('terms-overlay');
+const termsScroll         = document.getElementById('terms-scroll');
+const termsAgreeBtn       = document.getElementById('terms-agree-btn');
+const termsPct            = document.getElementById('terms-pct');
+const termsProgressBar    = document.getElementById('terms-progress-bar');
+
+// ─── STATE ─────────────────────────────────────────────────────────────────────
+const days      = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+let selectedDay = null;
+let runAppaway  = true;
+let runawayTimer = null;
+
+const captchas = [
+    "Type the 47th digit of Pi to proceed:",
+    "What is the binary equivalent of the decimal number 14?",
+    "Type a password that would make a hacker cry:",
+    "If a tree falls in a forest, what is the square root of 64?",
+    "Spell 'rhythm' backwards without using the letter 'h':",
+    "Explain the plot of Inception using only emojis:",
+    "Provide a written apology to the algorithm for your past sins:",
+    "Type the Wi-Fi password of your neighbor's neighbor:",
+    "Which key is directly above the 'Caps Lock' key?",
+    "Complete this sequence: 128, 256, 512, ____:",
+    "What is the hexadecimal letter for the decimal number 10?",
+    "How many bits make up one standard byte?",
+    "Who is the first computer programmer? (Ada ____):",
+    "What does the 'C' in 'CPU' stand for?"
+];
+
+const messages = [
+    "Running DNA Analysis...",
+    "Consulting Elon Musk...",
+];
+
+const progressWarnings = [
+    "⚠️ Gerald the Hamster is tired. Please wait.",
+    "⚠️ WARNING: Dividing by zero. Recalculating existence...",
+    "⚠️ NASA has put us on hold. Playing hold music.",
+    "⚠️ Gerald fell off the wheel. Restarting Gerald.",
+    "⚠️ Your question has broken 3 servers in Singapore.",
+    "⚠️ The quantum computer is questioning its life choices.",
+];
+
+// ─── DAY BUTTONS ──────────────────────────────────────────────────────────────
+days.forEach((day, index) => {
+    const btn = document.createElement('button');
+    btn.className = 'bg-white border-2 border-gray-200 text-gray-700 font-semibold py-2 px-3 rounded-xl hover:border-blue-500 hover:text-blue-600 transition-colors focus:outline-none text-sm sm:text-base';
+    btn.innerText = day;
+    if (index === 6) btn.classList.add('col-span-2');
+    btn.onclick = () => {
+        Array.from(dayButtonsContainer.children).forEach(c =>
+            c.classList.remove('bg-blue-50','border-blue-500','text-blue-600')
+        );
+        btn.classList.add('bg-blue-50','border-blue-500','text-blue-600');
+        selectedDay = day;
+        predictBtn.classList.remove('opacity-50','cursor-not-allowed');
+        predictBtn.disabled = false;
+    };
+    dayButtonsContainer.appendChild(btn);
+});
+
+// ─── RUNAWAY BUTTON ───────────────────────────────────────────────────────────
+predictBtn.addEventListener('mouseover', () => {
+    if (!runawayTimer && runAppaway && selectedDay) {
+        runawayTimer = setTimeout(() => {
+            runAppaway = false;
+            predictBtn.style.transform = 'translate(0px, 0px)';
+        }, 5000);
+    }
+    if (runAppaway && selectedDay) {
+        const maxX = Math.max(0, phaseInput.offsetWidth - predictBtn.offsetWidth);
+        const randomX = Math.floor(Math.random() * maxX) - (maxX / 2);
+        const randomY = Math.floor(Math.random() * 80) - 40;
+        predictBtn.style.transform = `translate(${randomX}px, ${randomY}px)`;
+    }
+});
+
+predictBtn.addEventListener('touchstart', (e) => {
+    if (runAppaway && selectedDay) {
+        e.preventDefault(); 
+        const maxX = Math.max(0, phaseInput.offsetWidth - predictBtn.offsetWidth);
+        const randomX = Math.floor(Math.random() * maxX) - (maxX / 2);
+        const randomY = Math.floor(Math.random() * 80) - 40;
+        predictBtn.style.transform = `translate(${randomX}px, ${randomY}px)`;
+        
+        if (!runawayTimer) {
+            runawayTimer = setTimeout(() => {
+                runAppaway = false;
+                predictBtn.style.transform = 'translate(0px, 0px)';
+            }, 5000);
+        }
+    }
+}, {passive: false});
+
+// ─── PREDICT BUTTON → SHOW TERMS ──────────────────────────────────────────────
+predictBtn.onclick = () => {
+    if (!selectedDay) return;
+    showTerms();
+};
+
+function enableTermsBtn() {
+    termsAgreeBtn.disabled = false;
+    termsAgreeBtn.style.background = '#4f46e5';
+    termsAgreeBtn.style.color = '#fff';
+    termsAgreeBtn.style.cursor = 'pointer';
+}
+
+function showTerms() {
+    termsOverlay.style.display = 'flex';
+    termsScroll.scrollTop = 0;
+    termsAgreeBtn.disabled = true;
+    termsAgreeBtn.style.background = '#e5e7eb';
+    termsAgreeBtn.style.color = '#9ca3af';
+    termsAgreeBtn.style.cursor = 'not-allowed';
+    termsPct.innerText = '0%';
+    termsProgressBar.style.width = '0%';
+    
+    setTimeout(() => {
+        if (termsScroll.scrollHeight <= termsScroll.clientHeight) {
+            termsPct.innerText = '100%';
+            termsProgressBar.style.width = '100%';
+            enableTermsBtn();
+        }
+    }, 100);
+}
+
+termsScroll.addEventListener('scroll', () => {
+    const scrollableDistance = termsScroll.scrollHeight - termsScroll.clientHeight;
+    if (scrollableDistance <= 0) return;
+    
+    const pct = Math.min(100, Math.round((termsScroll.scrollTop / scrollableDistance) * 100));
+    termsPct.innerText = pct + '%';
+    termsProgressBar.style.width = pct + '%';
+    
+    if (pct >= 95) {
+        enableTermsBtn();
+    }
+});
+
+termsAgreeBtn.onclick = () => {
+    termsOverlay.style.display = 'none';
+    phaseInput.classList.add('hidden');
+    phaseCaptcha.classList.remove('hidden');
+    phaseCaptcha.classList.add('flex');
+    captchaQuestion.innerText = captchas[Math.floor(Math.random() * captchas.length)];
+    captchaInput.value = '';
+    captchaError.classList.add('hidden');
+};
+
+// ─── CAPTCHA VERIFY ───────────────────────────────────────────────────────────
+verifyBtn.onclick = async () => {
+    if (captchaInput.value.trim() === '') {
+        captchaError.innerText = "Error: Input required. Are you a toaster?";
+        captchaError.classList.remove('hidden');
+        return;
+    }
+    verifyBtn.innerText = "ANALYZING BIOMETRICS...";
+    verifyBtn.classList.replace('bg-gray-800','bg-blue-600');
+    verifyBtn.disabled = true;
+    await Tone.start();
+    setTimeout(() => {
+        phaseCaptcha.classList.add('hidden');
+        phaseCaptcha.classList.remove('flex');
+        phaseLoading.classList.remove('hidden');
+        phaseLoading.classList.add('flex');
+        appContainer.classList.add('shake-active');
+        startFakeProcess();
+    }, 2000);
+};
+
+// ─── AUDIO ────────────────────────────────────────────────────────────────────
+function playDialupSound() {
+    try {
+        const synth = new Tone.PolySynth(Tone.Synth).toDestination();
+        const notes = ["C4","E4","G4","B4","C5"];
+        let time = Tone.now();
+        for (let i = 0; i < 30; i++) {
+            const note = notes[Math.floor(Math.random() * notes.length)];
+            synth.triggerAttackRelease(note, "16n", time);
+            time += 0.1;
+        }
+    } catch(e) {}
+}
+
+function playWrongSound() {
+    try {
+        const synth = new Tone.Synth({ oscillator: { type: "sawtooth" } }).toDestination();
+        synth.triggerAttackRelease("A2", "0.3", Tone.now());
+        synth.triggerAttackRelease("G2", "0.3", Tone.now() + 0.3);
+        synth.triggerAttackRelease("F2", "0.5", Tone.now() + 0.6);
+    } catch(e) {}
+}
+
+// ─── BSOD ─────────────────────────────────────────────────────────────────────
+function showBSOD(callback) {
+    bsodOverlay.style.display = 'flex';
+    const bsodBar     = document.getElementById('bsod-bar');
+    const bsodCounter = document.getElementById('bsod-counter');
+    let count = 10;
+    bsodCounter.innerText = count;
+    bsodBar.style.width = '0%';
+    const t = setInterval(() => {
+        count--;
+        bsodCounter.innerText = count;
+        bsodBar.style.width = ((10 - count) / 10 * 100) + '%';
+        if (count <= 0) {
+            clearInterval(t);
+            bsodOverlay.style.display = 'none';
+            callback();
+        }
+    }, 1000);
+}
+
+// ─── LOADING PROCESS ──────────────────────────────────────────────────────────
+function startFakeProcess() {
+    playDialupSound();
+
+    let currentMsgIndex = 0;
+    let progress = 0;
+    let bsodFired = false;
+    const totalTime = messages.length * 3000;
+    const updateInterval = 50;
+    const totalSteps = totalTime / updateInterval;
+    const progressPerStep = 100 / totalSteps;
+
+    loadingMessage.innerText = messages[0];
+
+    const msgInterval = setInterval(() => {
+        currentMsgIndex++;
+        if (currentMsgIndex < messages.length) {
+            loadingMessage.innerText = messages[currentMsgIndex];
+            try {
+                const osc = new Tone.Oscillator(440 + Math.random() * 400, "square").toDestination();
+                osc.start().stop("+0.1");
+            } catch(e) {}
+        }
+        if (Math.random() > 0.55) {
+            progressWarning.innerText = progressWarnings[Math.floor(Math.random() * progressWarnings.length)];
+            setTimeout(() => { progressWarning.innerText = ''; }, 2500);
+        }
+    }, 3000);
+
+    const terminalInterval = setInterval(() => {
+        const hashes = Math.random().toString(36).substring(2, 15);
+        const statusOptions = ['OK','WARN','ERR','RETRY','SUDO','???'];
+        const status = statusOptions[Math.floor(Math.random() * statusOptions.length)];
+        const line = document.createElement('div');
+        line.innerText = `> [SYSTEM] resolving sector ${hashes}... ${status}`;
+        if (status === 'ERR' || status === '???') line.style.color = '#f87171';
+        if (status === 'WARN')  line.style.color = '#fbbf24';
+        terminalOutput.appendChild(line);
+        if (terminalOutput.children.length > 5) terminalOutput.removeChild(terminalOutput.firstChild);
+    }, 350);
+
+    const progressInterval = setInterval(() => {
+        progress += progressPerStep;
+
+        if (progress >= 48 && !bsodFired) {
+            bsodFired = true;
+            clearInterval(progressInterval);
+            clearInterval(msgInterval);
+            clearInterval(terminalInterval);
+            appContainer.classList.remove('shake-active');
+
+            setTimeout(() => {
+                showBSOD(() => {
+                    phaseLoading.classList.remove('hidden');
+                    phaseLoading.classList.add('flex');
+                    appContainer.classList.add('shake-active');
+                    loadingMessage.innerText = "Rebooting quantum brain... (again)";
+                    resumeProcess(progress, msgInterval);
+                });
+            }, 500);
+            return;
+        }
+
+        if (progress > 100) progress = 100;
+        progressBar.style.width = progress + '%';
+        progressPercentage.innerText = Math.floor(progress) + '%';
+
+        if (progress >= 100) {
+            clearInterval(msgInterval);
+            clearInterval(progressInterval);
+            clearInterval(terminalInterval);
+            progressBar.style.width = '100%';
+            progressPercentage.innerText = '100%';
+            appContainer.classList.remove('shake-active');
+            setTimeout(showResult, 500);
+        }
+    }, updateInterval);
+}
+
+function resumeProcess(startProgress, _) {
+    playDialupSound();
+    let progress = startProgress;
+    const updateInterval = 50;
+    const remainingSteps = (100 - progress) / (100 / ((messages.length * 3000) / updateInterval));
+    const progressPerStep = (100 - progress) / remainingSteps;
+    let msgIdx = Math.floor(messages.length / 2);
+
+    loadingMessage.innerText = messages[msgIdx];
+
+    const msgInterval2 = setInterval(() => {
+        msgIdx++;
+        if (msgIdx < messages.length) {
+            loadingMessage.innerText = messages[msgIdx];
+            try {
+                const osc = new Tone.Oscillator(440 + Math.random() * 400, "square").toDestination();
+                osc.start().stop("+0.1");
+            } catch(e) {}
+        }
+    }, 3000);
+
+    const termInterval2 = setInterval(() => {
+        const hashes = Math.random().toString(36).substring(2, 15);
+        const line = document.createElement('div');
+        line.innerText = `> [RECOVERY] re-initializing ${hashes}... OK`;
+        line.style.color = '#86efac';
+        terminalOutput.appendChild(line);
+        if (terminalOutput.children.length > 5) terminalOutput.removeChild(terminalOutput.firstChild);
+    }, 350);
+
+    const progInterval2 = setInterval(() => {
+        progress += progressPerStep * 1.2;
+        if (progress > 100) progress = 100;
+        progressBar.style.width = progress + '%';
+        progressPercentage.innerText = Math.floor(progress) + '%';
+
+        if (progress >= 100) {
+            clearInterval(msgInterval2);
+            clearInterval(progInterval2);
+            clearInterval(termInterval2);
+            progressBar.style.width = '100%';
+            progressPercentage.innerText = '100%';
+            appContainer.classList.remove('shake-active');
+            setTimeout(showResult, 500);
+        }
+    }, updateInterval);
+}
+
+// ─── RESULT ───────────────────────────────────────────────────────────────────
+function showResult() {
+    phaseLoading.classList.add('hidden');
+    phaseLoading.classList.remove('flex');
+    phaseResult.classList.remove('hidden');
+
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const actualTomorrow = dayNames[tomorrow.getDay()];
+
+    if (selectedDay === actualTomorrow) {
+        resultHeading.innerText = "Prediction Complete!";
+        resultHeading.className = "text-xl text-gray-800 mb-2";
+        resultText.innerText = `Tomorrow is indeed ${selectedDay}`;
+        resultText.className = "text-2xl font-black text-green-700";
+
+        aiReportBox.className = "bg-yellow-50 border border-yellow-200 p-4 rounded-lg";
+        aiReportTitle.innerText = "🧠 AI Analysis Report:";
+        aiReportTitle.className = "text-sm font-bold text-yellow-800";
+        aiReportText.innerText = "Your IQ is higher than 99.9% of all humanity for knowing this.\n\nYou are a genius. Gerald the hamster is proud of you.\n\n(It still took 63 seconds and a BSOD to confirm what any calendar would have told you instantly. But still. Genius.)";
+        aiReportText.className = "text-sm text-yellow-700 mt-1";
+
+        resultIcon.innerHTML = `<svg class="w-10 h-10 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>`;
+        resultIconContainer.className = "inline-flex items-center justify-center w-20 h-20 bg-green-100 rounded-full mb-4";
+        resultBoxContainer.className = "bg-green-50 border-2 border-green-200 rounded-xl p-6";
+
+        fireConfetti();
+    } else {
+        playWrongSound();
+        wrongWatermark.style.display = 'flex';
+        document.body.style.animation = 'blink-red 0.3s 4';
+
+        resultHeading.innerText = "Catastrophic Failure!";
+        resultHeading.className = "text-xl text-red-800 font-bold mb-2";
+        resultText.innerText = `Tomorrow is actually ${actualTomorrow}`;
+        resultText.className = "text-2xl font-black text-red-700";
+
+        aiReportBox.className = "bg-red-50 border border-red-200 p-4 rounded-lg";
+        aiReportTitle.innerText = "🤡 AI Analysis Report:";
+        aiReportTitle.className = "text-sm font-bold text-red-800";
+        aiReportText.innerText =
+            "I hacked NASA,\n" +
+            "Borrowed a quantum supercomputer,\n" +
+            "Diverted power from a small European nation,\n" +
+            "Survived a BSOD for you,\n" +
+            "Sent an intern to the future to verify,\n" +
+            "And disturbed Stephen Hawking's peace.\n\n" +
+            "All for you to fail a kindergarten-level calendar quiz.\n\n" +
+            "You Absolute Dumbass...";
+        aiReportText.className = "text-sm text-red-700 mt-1 font-medium";
+
+        resultIcon.innerHTML = `<svg class="w-10 h-10 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"></path></svg>`;
+        resultIconContainer.className = "inline-flex items-center justify-center w-20 h-20 bg-red-100 rounded-full mb-4";
+        resultBoxContainer.className = "bg-red-50 border-2 border-red-200 rounded-xl p-6";
+
+        appContainer.style.animation = 'blink-red 0.3s 6';
+        setTimeout(() => { appContainer.style.animation = ''; }, 2000);
+    }
+}
+
+function fireConfetti() {
+    const end = Date.now() + 3000;
+    (function frame() {
+        confetti({ particleCount: 5, angle: 60,  spread: 55, origin: { x: 0 }, colors: ['#26ccff','#a25afd','#ff5e7e','#88ff5a','#fcff42','#ffa62d','#ff36ff'] });
+        confetti({ particleCount: 5, angle: 120, spread: 55, origin: { x: 1 }, colors: ['#26ccff','#a25afd','#ff5e7e','#88ff5a','#fcff42','#ffa62d','#ff36ff'] });
+        if (Date.now() < end) requestAnimationFrame(frame);
+    }());
+}
+
+// ════════════════════════════════════════════════════
+// SUBSCRIBE MODAL
+// ════════════════════════════════════════════════════
+var smPriceTimer = null;
+var smCurrentPrice = 99.99;
+var smBasePrice = 736.42;
+var smProcTimer = null;
+
+function smOpen() {
+    document.getElementById('subscribe-modal-overlay').style.display = 'flex';
+    smResetStages();
+    smGoStage(1);
+}
+
+function smClose() {
+    clearInterval(smPriceTimer);
+    clearInterval(smProcTimer);
+    document.getElementById('subscribe-modal-overlay').style.display = 'none';
+    smResetStages();
+}
+
+function smResetStages() {
+    smCurrentPrice = 99.99;
+    smBasePrice = 736.42;
+    document.querySelectorAll('.sm-pill').forEach(function(p) { p.classList.remove('strike'); });
+    var cp = document.getElementById('sm-custom-price');
+    if (cp) cp.textContent = '$736.42';
+    
+    var fc = document.getElementById('sm-f-card');    
+    if (fc) fc.value = '';
+    
+    var fe = document.getElementById('sm-f-expiry');  
+    if (fe) fe.value = '';
+    
+    var fv = document.getElementById('sm-f-cvv');     
+    if (fv) fv.value = '';
+    
+    var fb = document.getElementById('sm-f-blood');   
+    if (fb) fb.value = '';
+    
+    var fd = document.getElementById('sm-f-dino');    
+    if (fd) fd.value = '';
+    
+    var er = document.getElementById('sm-form-error');
+    if (er) er.classList.remove('show');
+    
+    var fields = ['sm-f-card','sm-f-expiry','sm-f-cvv','sm-f-blood','sm-f-dino'];
+    fields.forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.classList.remove('sm-error');
+    });
+}
+
+function smGoStage(n) {
+    clearInterval(smPriceTimer);
+    clearInterval(smProcTimer);
+    document.querySelectorAll('.sm-stage').forEach(function(s) { s.classList.remove('active'); });
+    var id = (n === 'out') ? 'sm-sout' : ('sm-s' + n);
+    var el = document.getElementById(id);
+    if (el) el.classList.add('active');
+    if (n === 1) smStartPriceTicker();
+    if (n === 4) smStartFakeCheckout();
+}
+
+function smStartPriceTicker() {
+    smCurrentPrice = 99.99;
+    smRenderPrice();
+    smPriceTimer = setInterval(function() {
+        smCurrentPrice = +(smCurrentPrice + (Math.random() * 3 + 0.5)).toFixed(2);
+        smRenderPrice();
+    }, 900);
+}
+
+function smRenderPrice() {
+    var disp = '$' + smCurrentPrice.toFixed(2);
+    var pc = document.getElementById('sm-price-counter');
+    var bb = document.getElementById('sm-buy-btn');
+    if (pc) pc.textContent = disp;
+    if (bb) bb.textContent = 'Buy Now at ' + disp;
+}
+
+document.querySelectorAll('#sm-feature-pills .sm-pill').forEach(function(pill) {
+    pill.addEventListener('click', function() {
+        var delta = parseFloat(pill.dataset.price);
+        if (pill.classList.contains('strike')) {
+            pill.classList.remove('strike');
+            smBasePrice = +(smBasePrice + delta).toFixed(2);
+        } else {
+            pill.classList.add('strike');
+            smBasePrice = +(Math.max(699.99, smBasePrice - delta)).toFixed(2);
+        }
+        var el = document.getElementById('sm-custom-price');
+        if (el) el.textContent = '$' + smBasePrice.toFixed(2);
+    });
+});
+
+function smShakeBox() {
+    var el = document.getElementById('subscribe-modal-box');
+    if (!el) return;
+    var moves = [-7, 7, -5, 5, -3, 3, 0];
+    var i = 0;
+    var t = setInterval(function() {
+        el.style.transform = 'translateX(' + moves[i] + 'px)';
+        i++;
+        if (i >= moves.length) { clearInterval(t); el.style.transform = ''; }
+    }, 50);
+}
+
+function smSubmitForm() {
+    var card   = document.getElementById('sm-f-card').value.trim();
+    var expiry = document.getElementById('sm-f-expiry').value.trim();
+    var cvv    = document.getElementById('sm-f-cvv').value.trim();
+    var blood  = document.getElementById('sm-f-blood').value.trim();
+    var dino   = document.getElementById('sm-f-dino').value;
+    var errEl  = document.getElementById('sm-form-error');
+
+    var fieldIds = ['sm-f-card','sm-f-expiry','sm-f-cvv','sm-f-blood','sm-f-dino'];
+    fieldIds.forEach(function(id) {
+        document.getElementById(id).classList.remove('sm-error');
+    });
+
+    var hasError = false;
+    if (!card)   { document.getElementById('sm-f-card').classList.add('sm-error');   hasError = true; }
+    if (!expiry) { document.getElementById('sm-f-expiry').classList.add('sm-error'); hasError = true; }
+    if (!cvv)    { document.getElementById('sm-f-cvv').classList.add('sm-error');    hasError = true; }
+    if (!blood)  { document.getElementById('sm-f-blood').classList.add('sm-error');  hasError = true; }
+    if (!dino)   { document.getElementById('sm-f-dino').classList.add('sm-error');   hasError = true; }
+
+    if (hasError) {
+        errEl.classList.add('show');
+        smShakeBox();
+        return;
+    }
+    errEl.classList.remove('show');
+    smGoStage(4);
+}
+
+var smProcSteps = [
+    [12,  "Validating card details..."],
+    [25,  "Contacting 47 payment processors..."],
+    [38,  "Declined. Trying backup processor..."],
+    [50,  "Declined again. Attempting barter..."],
+    [61,  "Barter rejected. Trying crypto..."],
+    [72,  "Crypto wallet not found..."],
+    [83,  "Negotiating with a guy named Dave..."],
+    [91,  "Dave is thinking about it..."],
+    [97,  "Almost there..."],
+    [99,  "Any second now..."]
+];
+
+function smStartFakeCheckout() {
+    var pct = 0;
+    var stepIdx = 0;
+    var bar   = document.getElementById('sm-proc-bar');
+    var label = document.getElementById('sm-proc-label');
+    var pctEl = document.getElementById('sm-proc-pct');
+    var log   = document.getElementById('sm-proc-log');
+    log.innerHTML = '';
+    bar.style.background = '#1d4ed8';
+    bar.style.width = '0%';
+    document.getElementById('sm-proc-emoji').textContent = '⚙️';
+    document.getElementById('sm-proc-title').textContent = 'Processing your order...';
+    document.getElementById('sm-proc-sub').textContent = 'Do not close this window.';
+
+    smProcTimer = setInterval(function() {
+        if (pct < 99) {
+            pct = Math.min(99, +(pct + 0.55).toFixed(2));
+            bar.style.width = pct + '%';
+            pctEl.textContent = Math.floor(pct) + '%';
+
+            while (stepIdx < smProcSteps.length && pct >= smProcSteps[stepIdx][0]) {
+                label.textContent = smProcSteps[stepIdx][1];
+                var line = document.createElement('div');
+                line.className = 'sm-log-line';
+                line.textContent = '› ' + smProcSteps[stepIdx][1];
+                log.appendChild(line);
+                stepIdx++;
+            }
+        } else {
+            clearInterval(smProcTimer);
+            setTimeout(function() {
+                bar.style.background = '#991b1b';
+                bar.style.width = '100%';
+                pctEl.textContent = '99%';
+                label.textContent = 'Transaction voided.';
+                document.getElementById('sm-proc-emoji').textContent = '🚫';
+                document.getElementById('sm-proc-title').textContent = 'Order cancelled.';
+                document.getElementById('sm-proc-sub').textContent = 'Dave said no. It is final.';
+                var line = document.createElement('div');
+                line.className = 'sm-log-line final';
+                line.textContent = '› Dave said no.';
+                log.appendChild(line);
+                setTimeout(function() { smGoStage('out'); }, 2500);
+            }, 700);
+        }
+    }, 80);
+}
+// ════ End Subscribe Modal ════
+</script>
+</body>
+</html>
